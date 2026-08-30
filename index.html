@@ -65,6 +65,7 @@
 <div class="wrap" id="form-screen">
   <label>¿Quién sos?</label>
   <select id="persona"></select>
+  <div class="calc" id="info" style="display:none"></div>
   <button class="link" id="btn-otro" onclick="modoOtro()">Mi nombre no está en la lista</button>
   <div id="otro-box" style="display:none">
     <label>Escribí tu nombre y apellido</label>
@@ -86,14 +87,14 @@
 
   <div class="calc" id="calc">Elegí las fechas.</div>
 
-  <button class="big" id="enviar" onclick="enviar()">Cargar ausencia</button>
+  <button class="big" id="enviar" onclick="enviar()">Enviar solicitud</button>
 </div>
 
 <!-- OK -->
 <div id="ok-screen">
   <div class="check">✅</div>
-  <h2>¡Ausencia cargada!</h2>
-  <p class="muted">Ya la puede ver la oficina.</p>
+  <h2>¡Solicitud enviada!</h2>
+  <p class="muted">Queda pendiente de aprobación en la oficina.</p>
   <button class="big" style="max-width:260px;margin:22px auto 0" onclick="otraMas()">Cargar otra</button>
 </div>
 
@@ -138,10 +139,51 @@
         pintarTipos();
         var hoy = new Date().toISOString().slice(0,10);
         el("desde").value = hoy; el("hasta").value = hoy;
-        recalc();
+        recalc(); cargarInfo();
       })
       .catch(function(){ toast("Sin conexión, reintentá"); });
   }
+
+  function habilesAprox(d, h){
+    var n = 0, x = new Date(d+"T00:00:00"), fin = new Date(h+"T00:00:00");
+    while(x <= fin){ var g = x.getDay(); if(g!==0 && g!==6) n++; x.setDate(x.getDate()+1); }
+    return n;
+  }
+  function tipoNombre(k){ for(var i=0;i<TIPOS.length;i++) if(TIPOS[i].k===k) return TIPOS[i]; return TIPOS[0]; }
+
+  function cargarInfo(){
+    var box = el("info");
+    if(el("otro-box").style.display === "block"){ box.style.display = "none"; return; }
+    var id = Number(el("persona").value);
+    if(!id){ box.style.display = "none"; return; }
+    fetchJSON(API + "/persona?id=" + id)
+      .then(function(r){ return r.json(); })
+      .then(function(res){
+        var p = res.persona || {}, aus = res.ausencias || [];
+        var asign = Number(p.dias_asignados || 0);
+        var tomados = 0;
+        aus.forEach(function(a){ if(a.tipo === "vac") tomados += habilesAprox(a.desde, a.hasta); });
+        var saldo = asign - tomados;
+        var col = saldo < 0 ? "var(--rojo)" : saldo <= 3 ? "var(--ambar)" : "var(--menta)";
+        var html = "Asignados <b>"+asign+"</b> · tomados <b>"+tomados+"</b> · " +
+                   "te quedan <b style='color:"+col+"'>"+saldo+" días</b>";
+        if(aus.length){
+          html += "<br><span class='muted'>Fechas cargadas:</span>";
+          aus.slice(0,8).forEach(function(a){
+            var t = tipoNombre(a.tipo);
+            var marca = a.estado === "pendiente" ? " ⏳" : "";
+            html += "<br>· <span style='color:"+t.c+"'>■</span> " + t.n + ": " +
+                    a.desde.split("-").reverse().join("/") + " → " +
+                    a.hasta.split("-").reverse().join("/") + marca;
+          });
+        } else {
+          html += "<br><span class='muted'>Sin fechas cargadas todavía.</span>";
+        }
+        box.innerHTML = html; box.style.display = "block";
+      })
+      .catch(function(){ box.style.display = "none"; });
+  }
+  el("persona").addEventListener("change", cargarInfo);
 
   function pintarTipos(){
     var cont = el("tipos"); cont.innerHTML = "";
@@ -158,6 +200,7 @@
     el("otro-box").style.display = "block";
     el("persona").value = "";
     el("persona").disabled = true;
+    el("info").style.display = "none";
   }
 
   function recalc(){
@@ -192,13 +235,13 @@
       body: JSON.stringify(body)
     }).then(function(r){ return r.json().catch(function(){ return {}; }); })
       .then(function(res){
-        b.disabled = false; b.textContent = "Cargar ausencia";
+        b.disabled = false; b.textContent = "Enviar solicitud";
         if(res && res.error){ toast("❌ " + res.error); return; }
         el("form-screen").style.display = "none";
         el("ok-screen").style.display = "block";
       })
       .catch(function(){
-        b.disabled = false; b.textContent = "Cargar ausencia";
+        b.disabled = false; b.textContent = "Enviar solicitud";
         toast("❌ Sin conexión, reintentá");
       });
   }
