@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Cargar ausencia</title>
+<style>
+  :root{
+    --fondo:#0f1218; --card:#171c26; --card2:#1c222e; --borde:#242c39;
+    --menta:#2ee6a6; --celeste:#5bb0ff; --ambar:#f6b64b; --rojo:#f6465d;
+    --texto:#eef2f8; --suave:#8a94a6;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--fondo); color:var(--texto);
+    font-family:"IBM Plex Sans",-apple-system,Segoe UI,Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased; padding-bottom:40px}
+  header{position:sticky; top:0; background:var(--card); border-bottom:1px solid var(--borde);
+    padding:16px 18px; display:flex; align-items:center; gap:11px; z-index:5}
+  header .logo{width:38px; height:38px; border-radius:11px; background:#122436;
+    border:1px solid var(--borde); display:grid; place-items:center; font-size:18px}
+  header h1{margin:0; font-size:16px; font-weight:700}
+  header p{margin:1px 0 0; font-size:12px; color:var(--suave)}
+  .wrap{max-width:520px; margin:0 auto; padding:18px}
+  label{display:block; font-size:13px; font-weight:600; color:var(--suave); margin:16px 0 7px}
+  input,select{width:100%; background:var(--card); color:var(--texto);
+    border:1px solid var(--borde); border-radius:11px; padding:13px 14px; font-size:16px;
+    font-family:inherit}
+  input:focus,select:focus{outline:none; border-color:var(--celeste)}
+  .row{display:flex; gap:12px}
+  .row>div{flex:1}
+  .tipos{display:grid; grid-template-columns:1fr 1fr; gap:9px}
+  .tipo{display:flex; align-items:center; gap:9px; background:var(--card);
+    border:1px solid var(--borde); border-radius:11px; padding:12px 13px; cursor:pointer; font-size:14px}
+  .tipo .dot{width:12px; height:12px; border-radius:4px; flex:none}
+  .tipo.on{border-color:var(--menta); background:#12271f}
+  .calc{margin-top:14px; background:var(--card); border:1px dashed var(--borde);
+    border-radius:11px; padding:12px 14px; font-size:13px; color:var(--suave)}
+  .calc b{color:var(--menta); font-family:"IBM Plex Mono",monospace}
+  .calc.warn{border-color:var(--ambar); color:var(--ambar)}
+  .big{width:100%; margin-top:22px; background:var(--menta); color:#04120c; border:none;
+    border-radius:12px; padding:16px; font-size:16px; font-weight:700; cursor:pointer}
+  .big:disabled{background:var(--suave)}
+  .link{display:inline-block; margin-top:10px; color:var(--celeste); font-size:13px;
+    background:none; border:none; cursor:pointer; padding:0}
+  .muted{color:var(--suave)}
+  .err{color:var(--rojo); font-size:13px}
+  #pin-screen{display:none; flex-direction:column; align-items:center; text-align:center;
+    padding:60px 24px}
+  #pin-screen h1{font-size:20px; margin:0 0 6px}
+  #pin-screen input{max-width:240px; text-align:center; margin-top:18px}
+  #ok-screen{display:none; text-align:center; padding:56px 24px}
+  #ok-screen .check{font-size:56px}
+  #ok-screen h2{margin:12px 0 6px}
+  #toast{position:fixed; left:50%; bottom:26px; transform:translateX(-50%);
+    background:var(--card2); border:1px solid var(--borde); border-radius:12px;
+    padding:12px 18px; font-size:14px; box-shadow:0 8px 30px rgba(0,0,0,.5);
+    opacity:0; transition:opacity .2s; pointer-events:none; max-width:90%}
+  #toast.on{opacity:1}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🏖️</div>
+  <div><h1>Cargar ausencia</h1><p class="muted">Vacaciones y licencias</p></div>
+</header>
+
+<!-- PIN -->
+<div id="pin-screen">
+  <h1>Acceso</h1>
+  <p class="muted">Ingresá el PIN (solo la primera vez)</p>
+  <input id="pin-input" type="password" inputmode="text" placeholder="PIN"
+         onkeydown="if(event.key==='Enter')guardarPin()">
+  <p id="pin-err" class="err" style="display:none">PIN incorrecto</p>
+  <button class="big" style="max-width:240px" onclick="guardarPin()">Entrar</button>
+</div>
+
+<!-- Formulario -->
+<div class="wrap" id="form-screen" style="display:none">
+  <label>¿Quién sos?</label>
+  <select id="persona"></select>
+  <button class="link" id="btn-otro" onclick="modoOtro()">Mi nombre no está en la lista</button>
+  <div id="otro-box" style="display:none">
+    <label>Escribí tu nombre y apellido</label>
+    <input id="otro-nombre" type="text" placeholder="Nombre y apellido">
+    <label>Área (opcional)</label>
+    <input id="otro-area" type="text" placeholder="Ej. Contabilidad">
+  </div>
+
+  <label>Tipo de ausencia</label>
+  <div class="tipos" id="tipos"></div>
+
+  <div class="row">
+    <div><label>Desde</label><input id="desde" type="date"></div>
+    <div><label>Hasta</label><input id="hasta" type="date"></div>
+  </div>
+
+  <label>Comentario (opcional)</label>
+  <input id="coment" type="text" placeholder="Ej. viaje familiar">
+
+  <div class="calc" id="calc">Elegí las fechas.</div>
+
+  <button class="big" id="enviar" onclick="enviar()">Cargar ausencia</button>
+</div>
+
+<!-- OK -->
+<div id="ok-screen">
+  <div class="check">✅</div>
+  <h2>¡Ausencia cargada!</h2>
+  <p class="muted">Ya la puede ver la oficina.</p>
+  <button class="big" style="max-width:260px;margin:22px auto 0" onclick="otraMas()">Cargar otra</button>
+</div>
+
+<div id="toast"></div>
+
+<script>
+  var API = "https://ffczbimnuodzcbgsdxbx.supabase.co/functions/v1/cal-ausencias";
+  var PINKEY = "pin_cal_ausencias";
+  var TIPOS = [
+    {k:"vac", n:"Vacaciones",      c:"#2ee6a6"},
+    {k:"lic", n:"Licencia médica", c:"#5bb0ff"},
+    {k:"est", n:"Estudio / Examen", c:"#f6b64b"},
+    {k:"esp", n:"Especial / Otro", c:"#f6465d"}
+  ];
+  var tipoSel = "vac";
+
+  function pin(){ return localStorage.getItem(PINKEY) || ""; }
+  function el(id){ return document.getElementById(id); }
+  function toast(msg){ var t=el("toast"); t.textContent=msg; t.classList.add("on");
+    setTimeout(function(){ t.classList.remove("on"); }, 2600); }
+
+  function mostrarPin(err){
+    el("pin-err").style.display = err ? "block" : "none";
+    el("pin-screen").style.display = "flex";
+    el("form-screen").style.display = "none";
+    el("ok-screen").style.display = "none";
+    var i=el("pin-input"); i.value=""; i.focus();
+  }
+  function guardarPin(){
+    var v = el("pin-input").value.trim();
+    if(!v) return;
+    localStorage.setItem(PINKEY, v);
+    iniciar();
+  }
+  function no401(r){
+    if(r.status === 401){ localStorage.removeItem(PINKEY); mostrarPin(true); throw "pin"; }
+    return r;
+  }
+
+  function fetchJSON(url, opts){
+    opts = opts || {};
+    var ctrl = new AbortController();
+    var t = setTimeout(function(){ ctrl.abort(); }, 20000);
+    opts.signal = ctrl.signal;
+    return fetch(url, opts).then(function(r){ clearTimeout(t); return r; });
+  }
+
+  function iniciar(){
+    fetchJSON(API + "/personas", {headers:{"x-pin":pin()}})
+      .then(no401).then(function(r){ return r.json(); })
+      .then(function(res){
+        var sel = el("persona");
+        sel.innerHTML = "";
+        (res.personas || []).forEach(function(p){
+          var o = document.createElement("option");
+          o.value = p.id; o.textContent = p.nombre + (p.area ? "  ·  " + p.area : "");
+          sel.appendChild(o);
+        });
+        if(!(res.personas || []).length){ modoOtro(); el("btn-otro").style.display = "none"; }
+        el("pin-screen").style.display = "none";
+        el("ok-screen").style.display = "none";
+        el("form-screen").style.display = "block";
+        pintarTipos();
+        var hoy = new Date().toISOString().slice(0,10);
+        el("desde").value = hoy; el("hasta").value = hoy;
+        recalc();
+      })
+      .catch(function(e){ if(e !== "pin") toast("Sin conexión, reintentá"); });
+  }
+
+  function pintarTipos(){
+    var cont = el("tipos"); cont.innerHTML = "";
+    TIPOS.forEach(function(t){
+      var d = document.createElement("div");
+      d.className = "tipo" + (t.k === tipoSel ? " on" : "");
+      d.innerHTML = '<span class="dot" style="background:'+t.c+'"></span>'+t.n;
+      d.onclick = function(){ tipoSel = t.k; pintarTipos(); };
+      cont.appendChild(d);
+    });
+  }
+
+  function modoOtro(){
+    el("otro-box").style.display = "block";
+    el("persona").value = "";
+    el("persona").disabled = true;
+  }
+
+  function recalc(){
+    var d = el("desde").value, h = el("hasta").value, box = el("calc");
+    box.classList.remove("warn");
+    if(!d || !h){ box.innerHTML = "Elegí las fechas."; return; }
+    if(h < d){ box.classList.add("warn"); box.innerHTML = "⚠️ La fecha final es anterior a la inicial."; return; }
+    var habiles = 0, x = new Date(d+"T00:00:00"), fin = new Date(h+"T00:00:00");
+    while(x <= fin){ var g = x.getDay(); if(g!==0 && g!==6) habiles++; x.setDate(x.getDate()+1); }
+    var corridos = Math.round((fin - new Date(d+"T00:00:00"))/86400000) + 1;
+    box.innerHTML = "Aproximadamente <b>"+habiles+"</b> días hábiles · "+corridos+" corridos.";
+  }
+  el("desde").addEventListener("change", recalc);
+  el("hasta").addEventListener("change", recalc);
+
+  function enviar(){
+    var d = el("desde").value, h = el("hasta").value;
+    if(!d || !h){ toast("Completá las fechas"); return; }
+    if(h < d){ toast("La fecha final es anterior"); return; }
+    var body = { tipo: tipoSel, desde: d, hasta: h, comentario: el("coment").value.trim() };
+    if(el("otro-box").style.display === "block"){
+      var nom = el("otro-nombre").value.trim();
+      if(!nom){ toast("Escribí tu nombre"); return; }
+      body.nombre = nom; body.area = el("otro-area").value.trim();
+    } else {
+      body.persona_id = Number(el("persona").value);
+      if(!body.persona_id){ toast("Elegí tu nombre"); return; }
+    }
+    var b = el("enviar"); b.disabled = true; b.textContent = "Cargando…";
+    fetchJSON(API + "/crear", {
+      method:"POST", headers:{"Content-Type":"application/json","x-pin":pin()},
+      body: JSON.stringify(body)
+    }).then(no401).then(function(r){ return r.json().catch(function(){ return {}; }); })
+      .then(function(res){
+        b.disabled = false; b.textContent = "Cargar ausencia";
+        if(res && res.error){ toast("❌ " + res.error); return; }
+        el("form-screen").style.display = "none";
+        el("ok-screen").style.display = "block";
+      })
+      .catch(function(e){
+        b.disabled = false; b.textContent = "Cargar ausencia";
+        if(e !== "pin") toast("❌ Sin conexión, reintentá");
+      });
+  }
+
+  function otraMas(){
+    el("coment").value = "";
+    el("otro-nombre") && (el("otro-nombre").value = "");
+    el("otro-box").style.display = "none";
+    el("persona").disabled = false;
+    tipoSel = "vac";
+    iniciar();
+  }
+
+  if(pin()) iniciar(); else mostrarPin(false);
+</script>
+</body>
+</html>
