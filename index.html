@@ -44,11 +44,6 @@
   .link{display:inline-block; margin-top:10px; color:var(--celeste); font-size:13px;
     background:none; border:none; cursor:pointer; padding:0}
   .muted{color:var(--suave)}
-  .err{color:var(--rojo); font-size:13px}
-  #pin-screen{display:none; flex-direction:column; align-items:center; text-align:center;
-    padding:60px 24px}
-  #pin-screen h1{font-size:20px; margin:0 0 6px}
-  #pin-screen input{max-width:240px; text-align:center; margin-top:18px}
   #ok-screen{display:none; text-align:center; padding:56px 24px}
   #ok-screen .check{font-size:56px}
   #ok-screen h2{margin:12px 0 6px}
@@ -66,18 +61,8 @@
   <div><h1>Cargar ausencia</h1><p class="muted">Vacaciones y licencias</p></div>
 </header>
 
-<!-- PIN -->
-<div id="pin-screen">
-  <h1>Acceso</h1>
-  <p class="muted">Ingresá el PIN (solo la primera vez)</p>
-  <input id="pin-input" type="password" inputmode="text" placeholder="PIN"
-         onkeydown="if(event.key==='Enter')guardarPin()">
-  <p id="pin-err" class="err" style="display:none">PIN incorrecto</p>
-  <button class="big" style="max-width:240px" onclick="guardarPin()">Entrar</button>
-</div>
-
 <!-- Formulario -->
-<div class="wrap" id="form-screen" style="display:none">
+<div class="wrap" id="form-screen">
   <label>¿Quién sos?</label>
   <select id="persona"></select>
   <button class="link" id="btn-otro" onclick="modoOtro()">Mi nombre no está en la lista</button>
@@ -116,7 +101,6 @@
 
 <script>
   var API = "https://ffczbimnuodzcbgsdxbx.supabase.co/functions/v1/cal-ausencias";
-  var PINKEY = "pin_cal_ausencias";
   var TIPOS = [
     {k:"vac", n:"Vacaciones",      c:"#2ee6a6"},
     {k:"lic", n:"Licencia médica", c:"#5bb0ff"},
@@ -125,28 +109,9 @@
   ];
   var tipoSel = "vac";
 
-  function pin(){ return localStorage.getItem(PINKEY) || ""; }
   function el(id){ return document.getElementById(id); }
   function toast(msg){ var t=el("toast"); t.textContent=msg; t.classList.add("on");
     setTimeout(function(){ t.classList.remove("on"); }, 2600); }
-
-  function mostrarPin(err){
-    el("pin-err").style.display = err ? "block" : "none";
-    el("pin-screen").style.display = "flex";
-    el("form-screen").style.display = "none";
-    el("ok-screen").style.display = "none";
-    var i=el("pin-input"); i.value=""; i.focus();
-  }
-  function guardarPin(){
-    var v = el("pin-input").value.trim();
-    if(!v) return;
-    localStorage.setItem(PINKEY, v);
-    iniciar();
-  }
-  function no401(r){
-    if(r.status === 401){ localStorage.removeItem(PINKEY); mostrarPin(true); throw "pin"; }
-    return r;
-  }
 
   function fetchJSON(url, opts){
     opts = opts || {};
@@ -157,8 +122,8 @@
   }
 
   function iniciar(){
-    fetchJSON(API + "/personas", {headers:{"x-pin":pin()}})
-      .then(no401).then(function(r){ return r.json(); })
+    fetchJSON(API + "/personas")
+      .then(function(r){ return r.json(); })
       .then(function(res){
         var sel = el("persona");
         sel.innerHTML = "";
@@ -168,15 +133,14 @@
           sel.appendChild(o);
         });
         if(!(res.personas || []).length){ modoOtro(); el("btn-otro").style.display = "none"; }
-        el("pin-screen").style.display = "none";
-        el("ok-screen").style.display = "none";
         el("form-screen").style.display = "block";
+        el("ok-screen").style.display = "none";
         pintarTipos();
         var hoy = new Date().toISOString().slice(0,10);
         el("desde").value = hoy; el("hasta").value = hoy;
         recalc();
       })
-      .catch(function(e){ if(e !== "pin") toast("Sin conexión, reintentá"); });
+      .catch(function(){ toast("Sin conexión, reintentá"); });
   }
 
   function pintarTipos(){
@@ -224,18 +188,18 @@
     }
     var b = el("enviar"); b.disabled = true; b.textContent = "Cargando…";
     fetchJSON(API + "/crear", {
-      method:"POST", headers:{"Content-Type":"application/json","x-pin":pin()},
+      method:"POST", headers:{"Content-Type":"application/json"},
       body: JSON.stringify(body)
-    }).then(no401).then(function(r){ return r.json().catch(function(){ return {}; }); })
+    }).then(function(r){ return r.json().catch(function(){ return {}; }); })
       .then(function(res){
         b.disabled = false; b.textContent = "Cargar ausencia";
         if(res && res.error){ toast("❌ " + res.error); return; }
         el("form-screen").style.display = "none";
         el("ok-screen").style.display = "block";
       })
-      .catch(function(e){
+      .catch(function(){
         b.disabled = false; b.textContent = "Cargar ausencia";
-        if(e !== "pin") toast("❌ Sin conexión, reintentá");
+        toast("❌ Sin conexión, reintentá");
       });
   }
 
@@ -248,7 +212,7 @@
     iniciar();
   }
 
-  if(pin()) iniciar(); else mostrarPin(false);
+  iniciar();
 </script>
 </body>
 </html>
