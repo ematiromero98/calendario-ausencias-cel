@@ -114,12 +114,36 @@
   function toast(msg){ var t=el("toast"); t.textContent=msg; t.classList.add("on");
     setTimeout(function(){ t.classList.remove("on"); }, 2600); }
 
+  // PIN de acceso: se guarda en el celu y viaja en el header x-pin. Sin PIN
+  // correcto, la función rechaza (401) y volvemos a pedirlo.
+  function getPin(){
+    var p = null;
+    try { p = localStorage.getItem("cal_pin"); } catch(e){}
+    while(!p){
+      p = window.prompt("Ingresá el PIN de acceso:");
+      if(p === null){ return ""; }
+      p = (p || "").trim();
+      if(p){ try { localStorage.setItem("cal_pin", p); } catch(e){} }
+    }
+    return p;
+  }
+
   function fetchJSON(url, opts){
     opts = opts || {};
+    opts.headers = opts.headers || {};
+    opts.headers["x-pin"] = getPin();
     var ctrl = new AbortController();
     var t = setTimeout(function(){ ctrl.abort(); }, 20000);
     opts.signal = ctrl.signal;
-    return fetch(url, opts).then(function(r){ clearTimeout(t); return r; });
+    return fetch(url, opts).then(function(r){
+      clearTimeout(t);
+      if(r.status === 401){                       // PIN mal: borrar y re-pedir
+        try { localStorage.removeItem("cal_pin"); } catch(e){}
+        toast("PIN incorrecto");
+        setTimeout(function(){ location.reload(); }, 1200);
+      }
+      return r;
+    });
   }
 
   function iniciar(){
